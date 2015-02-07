@@ -145,6 +145,7 @@ def store(args, syn):
         setattr(args, 'id', entity['id'])
         setAnnotations(args, syn)
 
+
 def associate(args, syn):
     if args.r:
         files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(args.path) for f in filenames]
@@ -184,15 +185,21 @@ def show(args, syn):
     """Show metadata for an entity."""
     
     ent = syn.get(args.id, downloadFile=False)
-    syn.printEntity(ent)
-    sys.stdout.write('Provenance:\n')
-    try:
-        prov = syn.getProvenance(ent)
-        print prov
-    except SynapseHTTPError as e:
-        print '  No Activity specified.\n'
 
-    
+    if args.field:
+        if type(ent[args.field]) is list:
+            print "/n".join(ent[args.field])
+        else:
+            print ent[args.field]
+    else:
+        syn.printEntity(ent)
+        sys.stdout.write('Provenance:\n')
+        try:
+            prov = syn.getProvenance(ent)
+            print prov
+        except SynapseHTTPError as e:
+            print '  No Activity specified.\n'
+
 def delete(args, syn):
     syn.delete(args.id)
     print 'Deleted entity: %s' % args.id
@@ -513,10 +520,11 @@ def build_parser():
     parser_show = subparsers.add_parser('show', help='show metadata for an entity')
     parser_show.add_argument('id', metavar='syn123', type=str,
             help='Synapse ID of form syn123 of desired synapse object')
+    parser_show.add_argument('--field', metavar='field', type=str, default=None,
+            help='Specific field to display')
     parser_show.add_argument('--limitSearch', metavar='projId', type=str, 
             help='Synapse ID of a container such as project or folder to limit search for provenance files.')
     parser_show.set_defaults(func=show)
-
     
     parser_cat = subparsers.add_parser('cat', help='prints a dataset from Synapse')
     parser_cat.add_argument('id', metavar='syn123', type=str,
