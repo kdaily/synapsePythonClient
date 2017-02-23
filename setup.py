@@ -11,7 +11,7 @@ if sys.version_info < (2, 7, 0):
 from setuptools import setup
 import json
 
-description = """A client for Synapse, a collaborative compute space 
+description = """A client for Synapse, a collaborative compute space
 that allows scientists to share and analyze data together.""".replace("\n", " ")
 
 long_description = """A client for Synapse, a collaborative compute
@@ -42,6 +42,7 @@ setup(name='synapseclient',
     ],
     extras_require = {
         'pandas':  ["pandas"],
+        'prov': ["prov"],
         'pysftp': ["pysftp>=0.2.8"]
     },
     test_suite='nose.collector',
