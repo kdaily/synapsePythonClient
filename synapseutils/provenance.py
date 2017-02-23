@@ -1,3 +1,11 @@
+"""Utilities for Synapse provenance.
+
+This module creates Provenance documents which capture the activity and attribution for a Synapse entity.
+
+The resulting document can be displayed as [PROV-N](http://www.w3.org/TR/prov-n/) or [PROV-JSON](https://www.w3.org/Submission/prov-json/).
+
+"""
+
 import synapseclient
 
 try:
@@ -13,6 +21,9 @@ except:
     raise
 
 class SynapseProvenance(object):
+    """Representation of provenance for a Synapse Entity.
+
+    """
 
     # prov_doc = SYNAPSE
 
