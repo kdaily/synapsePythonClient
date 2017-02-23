@@ -20,7 +20,7 @@ except:
     \n\n\n""")
     raise
 
-class SynapseProvenance(object):
+class SynapseProvenanceDocument(object):
     """Representation of provenance for a Synapse Entity.
 
     """
@@ -65,9 +65,9 @@ class SynapseProvenance(object):
     @staticmethod
     def make_prov_doc():
         doc = prov.model.ProvDocument()
-        doc.add_namespace('synapseEntity', 'https://www.synapse.org/#!Synapse:')
-        doc.add_namespace('synapseUser', 'https://www.synapse.org/#!Profile:')
-        doc.add_namespace('synapseActivity', 'activity:')
+        doc.add_namespace('synapseEntity', '/entity/')
+        doc.add_namespace('synapseUser', '/userProfile/')
+        doc.add_namespace('synapseActivity', '/activity/')
         return doc
 
     def _addUsedEntites(self):
