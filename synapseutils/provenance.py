@@ -29,9 +29,9 @@ class SynapseProvenanceDocument(object):
 
     # prov_doc = SYNAPSE
 
-    def __init__(self, e, annotations=[], *args, **kwargs):
+    def __init__(self, syn, e, annotations=[], *args, **kwargs):
 
-        self.syn = synapseclient.login(silent=True)
+        self.syn = syn
 
         self.prov_doc = self.make_prov_doc()
 
