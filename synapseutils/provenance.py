@@ -97,7 +97,7 @@ class SynapseProvenanceDocument(object):
                               downloadFile=False)
                 keys = set(self._annotations).intersection(tmp.annotations.keys())
                 annots = {"Entity:%s" % k: (tmp.annotations[k][0] if type(tmp.annotations[k]) is list else tmp.annotations[k]) for k in keys}
-                annots['Entity:label'] = self.entity.name
+                annots['Entity:name'] = self.entity.name
 
             except synapseclient.exceptions.SynapseHTTPError as e:
                 print e
