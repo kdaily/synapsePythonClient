@@ -1,12 +1,16 @@
-import os, json, tempfile, filecmp
-from nose.tools import assert_raises, assert_equal, assert_in
-from mock import MagicMock, patch
-import unit
-import synapseclient
-from synapseclient import File
-from synapseclient.exceptions import *
-from synapseclient import Evaluation
+import os, json, tempfile, base64, sys
+from mock import patch, mock_open, call
+from builtins import str
 
+import uuid
+import unit
+from nose.tools import assert_equal, assert_in, assert_raises, assert_is_none
+
+import synapseclient
+from synapseclient import Evaluation, File, concrete_types, Folder
+from synapseclient.exceptions import *
+from synapseclient.dict_object import DictObject
+import synapseclient.upload_functions as upload_functions
 
 def setup(module):
     print('\n')
@@ -71,12 +75,13 @@ def test_getWithEntityBundle(download_file_mock, get_file_URL_and_metadata_mock)
         print("removing cacheMap file: ", cacheMap)
         os.remove(cacheMap)
 
-    def _downloadFileHandle(url, path, fileHandle, retries=5):
+    def _downloadFileHandle(fileHandleId,  objectId, objectType, path, retries=5):
         print("mock downloading file to:", path)
         ## touch file at path
         with open(path, 'a'):
             os.utime(path, None)
         dest_dir, filename = os.path.split(path)
+        syn.cache.add(fileHandle, path)
         return path
 
     def _getFileHandleDownload(fileHandleId,  objectId, objectType='FileHandle'):
@@ -97,11 +102,11 @@ def test_getWithEntityBundle(download_file_mock, get_file_URL_and_metadata_mock)
                                  ifcollision="overwrite.local")
     print(e)
 
-    assert e.name == bundle["entity"]["name"]
-    assert e.parentId == bundle["entity"]["parentId"]
-    assert os.path.dirname(e.path) == temp_dir1
-    assert bundle["fileHandles"][0]["fileName"] == os.path.basename(e.path)
-    assert e.path == os.path.join(temp_dir1, bundle["fileHandles"][0]["fileName"])
+    assert_equal(e.name , bundle["entity"]["name"])
+    assert_equal(e.parentId , bundle["entity"]["parentId"])
+    assert_equal(utils.normalize_path(os.path.abspath(os.path.dirname(e.path))), utils.normalize_path(temp_dir1))
+    assert_equal(bundle["fileHandles"][0]["fileName"] , os.path.basename(e.path))
+    assert_equal(utils.normalize_path(os.path.abspath(e.path)), utils.normalize_path(os.path.join(temp_dir1, bundle["fileHandles"][0]["fileName"])))
 
     # 2. ----------------------------------------------------------------------
     # get without specifying downloadLocation
@@ -109,8 +114,8 @@ def test_getWithEntityBundle(download_file_mock, get_file_URL_and_metadata_mock)
 
     print(e)
 
-    assert e.name == bundle["entity"]["name"]
-    assert e.parentId == bundle["entity"]["parentId"]
+    assert_equal(e.name , bundle["entity"]["name"])
+    assert_equal(e.parentId , bundle["entity"]["parentId"])
     assert bundle["fileHandles"][0]["fileName"] in e.files
 
     # 3. ----------------------------------------------------------------------
@@ -130,33 +135,28 @@ def test_getWithEntityBundle(download_file_mock, get_file_URL_and_metadata_mock)
     # 4. ----------------------------------------------------------------------
     ## test preservation of local state
     url = 'http://foo.com/secretstuff.txt'
+    #need to create a bundle with externalURL
+    externalURLBundle = dict(bundle)
+    externalURLBundle['fileHandles'][0]['externalURL'] = url
     e = File(name='anonymous', parentId="syn12345", synapseStore=False, externalURL=url)
     e.local_state({'zap':'pow'})
-    e = syn._getWithEntityBundle(entityBundle=bundle, entity=e)
-    assert e.local_state()['zap'] == 'pow'
-    assert e.synapseStore == False
-    assert e.externalURL == url
+    e = syn._getWithEntityBundle(entityBundle=externalURLBundle, entity=e)
+    assert_equal(e.local_state()['zap'] , 'pow')
+    assert_equal(e.synapseStore , False)
+    assert_equal(e.externalURL , url)
 
     ## TODO: add more test cases for flag combination of this method
     ## TODO: separate into another test?
 
 
-@patch('synapseclient.Synapse.restGET')
 @patch('synapseclient.Synapse.restPOST')
 @patch('synapseclient.Synapse.getEvaluation')
 def test_submit(*mocks):
     mocks = [item for item in mocks]
-    GET_mock        = mocks.pop()
     POST_mock       = mocks.pop()
     getEvaluation_mock = mocks.pop()
     
     # -- Unmet access rights --
-    GET_mock.return_value = {'totalNumberOfResults': 2, 
-                             'results': [
-                                {'accessType': 'Foo', 
-                                 'termsOfUse': 'Bar'}, 
-                                {'accessType': 'bat', 
-                                 'termsOfUse': 'baz'}]}
     getEvaluation_mock.return_value = Evaluation(**{u'contentSource': u'syn1001',
                                                     u'createdOn': u'2013-11-06T06:04:26.789Z',
                                                     u'etag': u'86485ea1-8c89-4f24-a0a4-2f63bc011091',
@@ -166,28 +166,22 @@ def test_submit(*mocks):
                                                     u'status': u'OPEN',
                                                     u'submissionReceiptMessage': u'mmmm yummy!'})
 
-    assert_raises(SynapseAuthenticationError, syn.submit, "9090", "syn1001")
-    GET_mock.assert_called_once_with('/evaluation/9090/accessRequirementUnfulfilled')
     
     # -- Normal submission --
-    # Pretend the user has access rights 
-    GET_mock.return_value = {'totalNumberOfResults': 0, 'results': []}
-    
     # insert a shim that returns the dictionary it was passed after adding a bogus id
     def shim(*args):
-        assert args[0] == '/evaluation/submission?etag=Fake eTag'
+        assert_equal(args[0] , '/evaluation/submission?etag=Fake eTag')
         submission = json.loads(args[1])
         submission['id'] = 1234
         return submission
     POST_mock.side_effect = shim
     
     submission = syn.submit('9090', {'versionNumber': 1337, 'id': "Whee...", 'etag': 'Fake eTag'}, name='George', submitterAlias='Team X')
-    assert GET_mock.call_count == 2
 
-    assert submission.id == 1234
-    assert submission.evaluationId == '9090'
-    assert submission.name == 'George'
-    assert submission.submitterAlias == 'Team X'
+    assert_equal(submission.id , 1234)
+    assert_equal(submission.evaluationId , '9090')
+    assert_equal(submission.name , 'George')
+    assert_equal(submission.submitterAlias , 'Team X')
 
     print(submission)
 
@@ -211,7 +205,166 @@ def test_send_message():
                                 "Through caverns measureless to man\n"
                                 "Down to a sunless sea.\n"))
             msg = json.loads(post_mock.call_args_list[0][1]['body'])
-            assert msg["fileHandleId"] == "7365905", msg
-            assert msg["recipients"] == [1421212], msg
-            assert msg["subject"] == "Xanadu", msg
+            assert_equal(msg["fileHandleId"] , "7365905", msg)
+            assert_equal(msg["recipients"] , [1421212], msg)
+            assert_equal(msg["subject"] , "Xanadu", msg)
+
+
+def test_readSessionCache_bad_file_data():
+    with patch("os.path.isfile", return_value=True), \
+         patch("os.path.join"):
+
+        bad_cache_file_data = [
+                            '[]\n', # empty array
+                            '["dis"]\n', # array w/ element
+                            '{"is"}\n', # set with element ( '{}' defaults to empty map so no case for that)
+                            '[{}]\n', # array with empty set inside.
+                            '[{"snek"}]\n', # array with nonempty set inside
+                            'hissss\n' # string
+                            ]
+        expectedDict = {} # empty map
+        # read each bad input and makes sure an empty map is returned instead
+        for bad_data in bad_cache_file_data:
+            with patch("synapseclient.client.open", mock_open(read_data=bad_data), create=True):
+                assert_equal(expectedDict, syn._readSessionCache())
+
+
+def test_readSessionCache_good_file_data():
+    with patch("os.path.isfile", return_value=True), \
+         patch("os.path.join"):
+
+        expectedDict = {'AzureDiamond': 'hunter2',
+                        'ayy': 'lmao'}
+        good_data = json.dumps(expectedDict)
+        with patch("synapseclient.client.open", mock_open(read_data=good_data), create=True):
+            assert_equal(expectedDict, syn._readSessionCache())
+
+ 
+@patch("synapseclient.Synapse._getDefaultUploadDestination")
+def test__uploadExternallyStoringProjects_external_user(mock_upload_destination):
+    # setup
+    expected_storage_location_id = "1234567"
+    expected_local_state = {'_file_handle':{}, 'synapseStore':True}
+    expected_path = "~/fake/path/file.txt"
+    expected_path_expanded = os.path.expanduser(expected_path)
+    expected_file_handle_id = "8786"
+    mock_upload_destination.return_value = {'storageLocationId' : expected_storage_location_id,
+                                            'concreteType' : concrete_types.EXTERNAL_S3_UPLOAD_DESTINATION}
+
+    test_file = File(expected_path, parent="syn12345")
+
+
+    # method under test
+    with patch.object(synapseclient.upload_functions, "multipart_upload", return_value=expected_file_handle_id) as mocked_multipart_upload, \
+         patch.object(syn.cache, "add") as mocked_cache_add,\
+         patch.object(syn, "_getFileHandle") as mocked_getFileHandle:
+        file_handle = upload_functions.upload_file_handle(syn, test_file['parentId'], test_file['path']) #dotn care about filehandle for this test
+
+        mock_upload_destination.assert_called_once_with(test_file['parentId'])
+        mocked_multipart_upload.assert_called_once_with(syn, expected_path_expanded, contentType=None, storageLocationId=expected_storage_location_id)
+        mocked_cache_add.assert_called_once_with(expected_file_handle_id,expected_path_expanded)
+        mocked_getFileHandle.assert_called_once_with(expected_file_handle_id)
+        #test
+
+def test_login__only_username_config_file_username_mismatch():
+    if (sys.version < '3'):
+        configparser_package_name = 'ConfigParser'
+    else:
+        configparser_package_name = 'configparser'
+    with patch("%s.ConfigParser.items" % configparser_package_name) as config_items_mock,\
+         patch("synapseclient.Synapse._readSessionCache") as read_session_mock:
+            read_session_mock.return_value = {}  #empty session cache
+            config_items_mock.return_value = [('username', 'shrek'), ('apikey', base64.b64encode(b'thisIsMySwamp'))]
+            mismatch_username = "someBodyOnceToldMeTheWorldWasGonnaRollMe"
+
+            #should throw exception
+            assert_raises(SynapseAuthenticationError, syn.login, mismatch_username)
+
+            read_session_mock.assert_called_once()
+            config_items_mock.assert_called_once_with('authentication')
+
+
+def test_login__no_username_no_password_no_session_cache_no_config_file():
+    old_config_path = syn.configPath
+    old_session_filename = synapseclient.client.SESSION_FILENAME
+
+    #make client point to nonexistant session and config
+    syn.configPath = "~/" + str(uuid.uuid1())
+    synapseclient.client.SESSION_FILENAME = str(uuid.uuid1())
+
+    assert_raises(SynapseAuthenticationError, syn.login)
+
+    #revert changes
+    syn.configPath = old_config_path
+    synapseclient.client.SESSION_FILENAME = old_session_filename
+
+def test_findEntityIdByNameAndParent__None_parent():
+    entity_name = "Kappa 123"
+    expected_uri = "/entity/child"
+    expected_body = json.dumps({"parentId": None, "entityName": entity_name})
+    expected_id = "syn1234"
+    return_val = {'id' : expected_id}
+    with patch.object(syn, "restPOST", return_value=return_val) as mocked_POST:
+        entity_id = syn._findEntityIdByNameAndParent(entity_name)
+        mocked_POST.assert_called_once_with(expected_uri,body=expected_body )
+        assert_equal(expected_id, entity_id)
+
+def test_findEntityIdByNameAndParent__with_parent():
+    entity_name = "Kappa 123"
+    parentId = "syn42"
+    parent_entity = Folder(name="wwwwwwwwwwwwwwwwwwwwww@@@@@@@@@@@@@@@@", id=parentId, parent="fakeParent")
+    expected_uri = "/entity/child"
+    expected_body = json.dumps({"parentId": parentId, "entityName": entity_name})
+    expected_id = "syn1234"
+    return_val = {'id' : expected_id}
+    with patch.object(syn, "restPOST", return_value=return_val) as mocked_POST:
+        entity_id = syn._findEntityIdByNameAndParent(entity_name, parent_entity)
+        mocked_POST.assert_called_once_with(expected_uri,body=expected_body )
+        assert_equal(expected_id, entity_id)
+
+
+def test_findEntityIdByNameAndParent__404_error_no_result():
+    entity_name = "Kappa 123"
+    expected_uri = "/entity/child"
+    expected_body = json.dumps({"parentId": None, "entityName": entity_name})
+    fake_response = DictObject({"status_code": 404})
+    with patch.object(syn, "restPOST", side_effect=SynapseHTTPError(response=fake_response)) as mocked_POST:
+        assert_is_none(syn._findEntityIdByNameAndParent(entity_name))
+
+
+def test_getChildren__nextPageToken():
+    #setup
+    nextPageToken = "T O K E N"
+    parent_project_id_int = 42690
+    first_page = {'versionLabel': '1',
+                   'name': 'firstPageResult',
+                   'versionNumber': 1,
+                   'benefactorId': parent_project_id_int,
+                   'type': 'org.sagebionetworks.repo.model.FileEntity',
+                   'id': 'syn123'}
+    second_page = {'versionLabel': '1',
+                    'name': 'secondPageResult',
+                    'versionNumber': 1,
+                    'benefactorId': parent_project_id_int,
+                    'type': 'org.sagebionetworks.repo.model.Folder',
+                    'id': 'syn456'}
+    mock_responses = [ {'page': [first_page], 'nextPageToken': nextPageToken},
+                       {'page': [second_page], 'nextPageToken': None}]
+
+    with patch.object(syn, "restPOST", side_effect=mock_responses) as mocked_POST:
+        #method under test
+        children_generator = syn.getChildren('syn'+str(parent_project_id_int))
+
+        #assert check the results of the generator
+        result = next(children_generator)
+        assert_equal(first_page, result)
+        result = next(children_generator)
+        assert_equal(second_page, result)
+        assert_raises(StopIteration, next, children_generator)
+
+        #check that the correct POST requests were sent
+        #genrates JSOn for the expected request body
+        expected_request_JSON = lambda token: json.dumps({'parentId':'syn'+str(parent_project_id_int), 'includeTypes':["folder","file","table","link","entityview","dockerrepo"], 'sortBy':'NAME','sortDirection':'ASC', 'nextPageToken':token})
+        expected_POST_url = '/entity/children'
+        mocked_POST.assert_has_calls([call(expected_POST_url, body=expected_request_JSON(None)), call(expected_POST_url, body=expected_request_JSON(nextPageToken))])
 

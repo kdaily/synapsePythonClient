@@ -12,6 +12,7 @@ import synapseclient.client as client
 import synapseclient.utils as utils
 from synapseclient.exceptions import *
 from synapseclient import Project, File, Wiki, Activity, Evaluation
+from synapseclient.upload_functions import upload_synapse_s3
 
 import integration
 from integration import schedule_for_cleanup
@@ -32,7 +33,7 @@ def test_wikiAttachment():
     attachname = utils.make_bogus_data_file()
     schedule_for_cleanup(filename)
     schedule_for_cleanup(attachname)
-    fileHandle = syn._uploadToFileHandleService(filename)
+    fileHandle = upload_synapse_s3(syn, filename)
 
     # Create and store a Wiki 
     # The constructor should accept both file handles and file paths
@@ -91,11 +92,11 @@ def test_create_or_update_wiki():
     # create wiki once
     wiki = syn.store(Wiki(title='This is the title', owner=project, markdown="#Wikis are OK\n\nBlabber jabber blah blah blither blather bonk!"))
 
-    # for now, creating it again raises an exception, see SYNR-631
-    assert_raises(SynapseHTTPError,
-        syn.store, 
-        Wiki(title='This is a different title', owner=project, markdown="#Wikis are awesome\n\nNew babble boo flabble gibber wiggle sproing!"),
-        createOrUpdate=True)
+    # for now, creating it again it will be updated
+    new_title = 'This is a different title'
+    wiki = syn.store(Wiki(title=new_title, owner=project, markdown="#Wikis are awesome\n\nNew babble boo flabble gibber wiggle sproing!"), createOrUpdate=True)
+    assert_equal(new_title, syn.getWiki(wiki.ownerId)['title'])
+
 
 
 def test_wiki_version():

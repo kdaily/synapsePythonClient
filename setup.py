@@ -43,7 +43,9 @@ setup(name='synapseclient',
     extras_require = {
         'pandas':  ["pandas"],
         'prov': ["prov"],
-        'pysftp': ["pysftp>=0.2.8"]
+        'pydot': ["pydot"],
+        'pysftp': ["pysftp>=0.2.8"],
+        'boto3' : ["boto3"]
     },
     test_suite='nose.collector',
     tests_require=['nose', 'mock'],
