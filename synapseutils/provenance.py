@@ -6,6 +6,8 @@ The resulting document can be displayed as [PROV-N](http://www.w3.org/TR/prov-n/
 
 """
 
+import sys
+
 import synapseclient
 
 try:
@@ -27,7 +29,7 @@ class SynapseProvenanceDocument(object):
 
     # prov_doc = SYNAPSE
 
-    def __init__(self, e, *args, **kwargs):
+    def __init__(self, e, annotations=[], *args, **kwargs):
 
         self.syn = synapseclient.login(silent=True)
 
@@ -39,21 +41,23 @@ class SynapseProvenanceDocument(object):
         self._agents = {}
         self._entities = {}
         self._entities["%s.%s" % (self.entity.id, self.entity.versionNumber)] = self.entity
+        self._annotations = annotations
         self.set_provenance()
 
     def set_provenance(self):
-        annots = {"synapseEntity:%s" % k: v[0] if type(v) is list else v for k, v in self.entity.annotations.iteritems()}
+        keys = set(self._annotations).intersection(self.entity.annotations.keys())
+        annots = {"Entity:%s" % k: (self.entity.annotations[k][0] if type(self.entity.annotations[k]) is list else self.entity.annotations[k]) for k in keys}
         annots['prov:label'] = self.entity.name
 
-        self.prov_entity = self.prov_doc.entity('synapseEntity:%s.%s' % (self.entity.properties.id, self.entity.properties.versionNumber),
+        self.prov_entity = self.prov_doc.entity('Entity:%s.%s' % (self.entity.properties.id, self.entity.properties.versionNumber),
                                                 annots)
 
-        self._agents[self.activity['createdBy']] = self.prov_doc.agent('synapseUser:%s' % self.activity['createdBy'])
+        self._agents[self.activity['createdBy']] = self.prov_doc.agent('User:%s' % self.activity['createdBy'])
         self.prov_doc.wasAttributedTo(self.prov_entity, self._agents[self.activity['createdBy']])
 
         self._addUsedEntites()
 
-        self.prov_activity = self.prov_doc.activity('synapseActivity:%s' % self.activity['id'],
+        self.prov_activity = self.prov_doc.activity('Activity:%s' % self.activity['id'],
                                                    startTime=self.activity['createdOn'],
                                                    endTime=self.activity['createdOn'])
 
@@ -65,9 +69,9 @@ class SynapseProvenanceDocument(object):
     @staticmethod
     def make_prov_doc():
         doc = prov.model.ProvDocument()
-        doc.add_namespace('synapseEntity', '/entity/')
-        doc.add_namespace('synapseUser', '/userProfile/')
-        doc.add_namespace('synapseActivity', '/activity/')
+        doc.add_namespace('Entity', '/entity/')
+        doc.add_namespace('User', '/userProfile/')
+        doc.add_namespace('Activity', '/activity/')
         return doc
 
     def _addUsedEntites(self):
@@ -75,23 +79,28 @@ class SynapseProvenanceDocument(object):
         self._used_entities = {}
 
         for x in self.activity['used']:
-            _id = "%s.%s" % (x['reference']['targetId'], x['reference']['targetVersionNumber'])
+            try:
+                _id = "%s.%s" % (x['reference']['targetId'], x['reference']['targetVersionNumber'])
+            except KeyError as e:
+                sys.stderr.write(str(e))
+                continue
 
             try:
                 tmp = self.syn.get(x['reference']['targetId'], version=x['reference']['targetVersionNumber'],
                               downloadFile=False)
-                annots = {"synapseEntity:%s" % k: v[0] if type(v) is list else v for k, v in tmp.annotations.iteritems()}
+                keys = set(self._annotations).intersection(tmp.annotations.keys())
+                annots = {"Entity:%s" % k: (tmp.annotations[k][0] if type(tmp.annotations[k]) is list else tmp.annotations[k]) for k in keys}
             except synapseclient.exceptions.SynapseHTTPError as e:
                 print e
                 continue
 
-            self._used_entities[_id] = self.prov_doc.entity('synapseEntity:%s.%s' % (x['reference']['targetId'], x['reference']['targetVersionNumber']),
+            self._used_entities[_id] = self.prov_doc.entity('Entity:%s.%s' % (x['reference']['targetId'], x['reference']['targetVersionNumber']),
                                                             annots)
 
             try:
                 tmp_agent = self._agents[tmp.properties['createdBy']]
             except KeyError:
-                tmp_agent = self.prov_doc.agent('synapseUser:%s' % tmp.properties['createdBy'])
+                tmp_agent = self.prov_doc.agent('User:%s' % tmp.properties['createdBy'])
 
             self.prov_doc.wasAttributedTo(self._used_entities[_id], tmp_agent)
 

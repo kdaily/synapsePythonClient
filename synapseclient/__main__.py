@@ -72,6 +72,7 @@ import shutil
 import sys
 import synapseclient
 import synapseutils
+import synapseutils.provenance
 from . import Activity
 from . import utils
 import signal
@@ -212,9 +213,9 @@ def associate(args, syn):
             print('%s.%i\t%s' %(ent.id, ent.versionNumber, fp))
 
 def copy(args,syn):
-    mappings = synapseutils.copy(syn, args.id, args.destinationId, 
-                         copyWikiPage=args.skipCopyWiki, 
-                         excludeTypes=args.excludeTypes, 
+    mappings = synapseutils.copy(syn, args.id, args.destinationId,
+                         copyWikiPage=args.skipCopyWiki,
+                         excludeTypes=args.excludeTypes,
                          version=args.version, updateExisting=args.updateExisting,
                          setProvenance=args.setProvenance)
     print(mappings)
@@ -321,6 +322,27 @@ def getProvenance(args, syn):
         with open(args.output, 'w') as f:
             f.write(json.dumps(activity))
             f.write('\n')
+
+
+def getProvenanceDoc(args, syn):
+    from prov.dot import prov_to_dot
+
+    if not args.annotations:
+        annotations = []
+    else:
+        annotations = args.annotations
+
+    p = synapseutils.provenance.SynapseProvenanceDocument(args.id,
+                                                          annotations=annotations)
+
+    if args.format == "doc":
+        output = p.prov_doc.serialize()
+    elif args.format == "dot":
+        output = prov_to_dot(p.prov_doc).to_string()
+    else:
+        raise ValueError("Not a recognized format: %s" % args.format)
+
+    print(output)
 
 
 def setAnnotations(args, syn):
@@ -433,12 +455,12 @@ def test_encoding(args, syn):
 def build_parser():
     """Builds the argument parser and returns the result."""
 
-    USED_HELP=('Synapse ID, a url, or a local file path (of a file previously' 
+    USED_HELP=('Synapse ID, a url, or a local file path (of a file previously'
                'uploaded to Synapse) from which the specified entity is derived')
-    EXECUTED_HELP=('Synapse ID, a url, or a local file path (of a file previously' 
+    EXECUTED_HELP=('Synapse ID, a url, or a local file path (of a file previously'
                    'uploaded to Synapse) that was executed to generate the specified entity')
 
-    
+
     parser = argparse.ArgumentParser(description='Interfaces with the Synapse repository.')
     parser.add_argument('--version',  action='version',
             version='Synapse Client %s' % synapseclient.__version__)
@@ -482,7 +504,7 @@ def build_parser():
     parent_id_group.add_argument('--type', type=str, default='File',
             help='Type of object, such as "File", "Folder", or '
                  '"Project", to create in Synapse. Defaults to "File"')
-    
+
     parser_store.add_argument('--name', '-name', metavar='NAME', type=str, required=False,
             help='Name of data object in Synapse')
     parser_store.add_argument('--description', '-description', metavar='DESCRIPTION', type=str,
@@ -550,7 +572,7 @@ def build_parser():
     parser_cp.add_argument('--destinationId', metavar='syn123', type=str,
             help='Synapse ID of project or folder where file will be copied to.  If no destinationId specified, a new project is created')
     parser_cp.add_argument('--version','-v', metavar='1', type=int, default=None,
-            help=('Synapse version number of file, and link to retrieve.' 
+            help=('Synapse version number of file, and link to retrieve.'
                 'This parameter can only be used when copying files, or links'
                 'Defaults to most recent version.'))
     parser_cp.add_argument('--setProvenance', metavar='traceback', type=str, default='traceback',
@@ -680,6 +702,22 @@ def build_parser():
             const='STDOUT', nargs='?', type=str,
             help='Output the provenance record in JSON format')
     parser_get_provenance.set_defaults(func=getProvenance)
+
+    parser_get_provenance = subparsers.add_parser('get-provenance-doc',
+            help='show provenance records as provenance document.')
+    parser_get_provenance.add_argument('-id', '--id', metavar='syn123', type=str, required=True,
+            help='Synapse ID of entity whose provenance we are accessing.')
+    parser_get_provenance.add_argument('--version', metavar='version', type=int, required=False,
+            help='version of Synapse entity whose provenance we are accessing.')
+    parser_get_provenance.add_argument('--format', metavar='format', type=str,
+                                       default='doc',
+                                       required=False, choices=('doc', 'dot'),
+                                       help='Format to output.')
+    parser_get_provenance.add_argument('--annotations', metavar='list', type=str,
+                                       nargs="*", required=False,
+                                       help='version of Synapse entity whose provenance we are accessing.')
+
+    parser_get_provenance.set_defaults(func=getProvenanceDoc)
 
     parser_set_annotations = subparsers.add_parser('set-annotations',
             help='create annotations records')
