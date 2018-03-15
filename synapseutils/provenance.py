@@ -52,7 +52,14 @@ class SynapseProvenanceDocument(object):
         self.prov_entity = self.prov_doc.entity('Entity:%s.%s' % (self.entity.properties.id, self.entity.properties.versionNumber),
                                                 annots)
 
-        self._agents[self.activity['createdBy']] = self.prov_doc.agent('User:%s' % self.activity['createdBy'])
+        user = syn.getUserProfile(self.activity['createdBy'])
+        agentAnnots = {'agent:userName': user['username'],
+                       'agent:displayName': user['displayName']}
+
+        agent = self.prov_doc.agent('User:%s' % self.activity['createdBy'], agentAnnots)
+
+        self._agents[self.activity['createdBy']] = agent
+
         self.prov_doc.wasAttributedTo(self.prov_entity, self._agents[self.activity['createdBy']])
 
         self._addUsedEntites()
@@ -100,7 +107,10 @@ class SynapseProvenanceDocument(object):
             try:
                 tmp_agent = self._agents[tmp.properties['createdBy']]
             except KeyError:
-                tmp_agent = self.prov_doc.agent('User:%s' % tmp.properties['createdBy'])
+                user = syn.getUserProfile(tmp.properties['createdBy'])
+                tmpAnnots = {'agent:userName': user['username'],
+                               'agent:displayName': user['displayName']}
+               tmp_agent = self.prov_doc.agent('User:%s' % tmp.properties['createdBy'], tmpAnnots)
 
             self.prov_doc.wasAttributedTo(self._used_entities[_id], tmp_agent)
 
