@@ -53,8 +53,8 @@ class SynapseProvenanceDocument(object):
                                                 annots)
 
         user = self.syn.getUserProfile(self.activity['createdBy'])
-        agentAnnots = {'user:userName': user['userName'],
-                       'user:displayName': user['displayName']}
+        agentAnnots = {'User:userName': user['userName'],
+                       'User:displayName': user['displayName']}
 
         agent = self.prov_doc.agent('User:%s' % self.activity['createdBy'], agentAnnots)
 
@@ -108,8 +108,8 @@ class SynapseProvenanceDocument(object):
                 tmp_agent = self._agents[tmp.properties['createdBy']]
             except KeyError:
                 user = self.syn.getUserProfile(tmp.properties['createdBy'])
-                tmpAnnots = {'user:userName': user['userName'],
-                               'user:displayName': user['displayName']}
+                tmpAnnots = {'User:userName': user['userName'],
+                               'User:displayName': user['displayName']}
                 tmp_agent = self.prov_doc.agent('User:%s' % tmp.properties['createdBy'], tmpAnnots)
 
             self.prov_doc.wasAttributedTo(self._used_entities[_id], tmp_agent)
