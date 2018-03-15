@@ -47,7 +47,7 @@ class SynapseProvenanceDocument(object):
     def set_provenance(self):
         keys = set(self._annotations).intersection(self.entity.annotations.keys())
         annots = {"Entity:%s" % k: (self.entity.annotations[k][0] if type(self.entity.annotations[k]) is list else self.entity.annotations[k]) for k in keys}
-        annots['Entity:label'] = self.entity.name
+        annots['Entity:name'] = self.entity.name
 
         self.prov_entity = self.prov_doc.entity('Entity:%s.%s' % (self.entity.properties.id, self.entity.properties.versionNumber),
                                                 annots)
