@@ -110,7 +110,7 @@ class SynapseProvenanceDocument(object):
                 user = syn.getUserProfile(tmp.properties['createdBy'])
                 tmpAnnots = {'agent:userName': user['username'],
                                'agent:displayName': user['displayName']}
-               tmp_agent = self.prov_doc.agent('User:%s' % tmp.properties['createdBy'], tmpAnnots)
+                tmp_agent = self.prov_doc.agent('User:%s' % tmp.properties['createdBy'], tmpAnnots)
 
             self.prov_doc.wasAttributedTo(self._used_entities[_id], tmp_agent)
 
