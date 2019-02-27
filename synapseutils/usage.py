@@ -1,5 +1,10 @@
 """Utilities for gathering usage information about things in Synapse.
 
+>>> import synapseclient
+>>> import synapseutils.usage
+>>> syn = synapseclient.login(silent=True)
+>>> user_permissions = synapseutils.usage.getEntityPermissions(syn, 'syn18349795')
+
 """
 
 import collections
