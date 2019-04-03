@@ -100,7 +100,7 @@ class SynapseProvenanceDocument(object):
                 annots['Entity:name'] = self.entity.name
 
             except synapseclient.exceptions.SynapseHTTPError as e:
-                print e
+                print(e)
                 continue
 
             self._used_entities[_id] = self.prov_doc.entity('Entity:%s.%s' % (x['reference']['targetId'], x['reference']['targetVersionNumber']),
