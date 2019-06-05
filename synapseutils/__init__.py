@@ -18,3 +18,4 @@ from .copy import copy, copyWiki, copyFileHandles, changeFileMetaData
 from .walk import walk
 from .sync import syncFromSynapse, syncToSynapse
 from .monitor import notifyMe, with_progress_bar
+from .validatequery import validate_query

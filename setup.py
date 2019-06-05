@@ -42,6 +42,7 @@ setuptools.setup(
         'pandas': ["pandas==0.23.0"],
         'pysftp': ["pysftp>=0.2.8"],
         'boto3' : ["boto3"],
+        'jsonschema': ["jsonschema>=3.0.1"],
         ':sys_platform=="linux2" or sys_platform=="linux"': ['keyrings.alt==3.1'],
     },
 
