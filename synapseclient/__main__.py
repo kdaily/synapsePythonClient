@@ -87,9 +87,16 @@ def query(args, syn):
 
     if re.search('from syn\d', queryString.lower()):
         results = syn.tableQuery(queryString)
-        reader = csv.reader(open(results.filepath))
-        for row in reader:
-            sys.stdout.write("%s\n" % ("\t".join(row)))
+
+        if (not args.delimiter) or (args.delimiter == ','):
+            print(open(results.filepath).read())
+        elif args.delimiter == '\t':
+            reader = csv.reader(open(results.filepath))
+            for row in reader:
+                sys.stdout.write("%s\n" % ("\t".join(row)))
+        else:
+            raise ValueError("The delimiter provided ({}) isn't valid".format(args.delimiter))
+
     else:
         sys.stderr.write('Input query cannot be parsed. Please see our documentation for writing Synapse query:'
                          ' https://docs.synapse.org/rest/org/sagebionetworks/repo/web/controller/TableExamples.html')
@@ -656,6 +663,8 @@ def build_parser():
 
     parser_query = subparsers.add_parser('query',
                                          help='Performs SQL like queries on Synapse')
+    parser_query.add_argument('--delimiter', metavar='string', type=str, default="\t",
+                              help="Delimiter of output (default: %(default)s)")
     parser_query.add_argument('queryString', metavar='string', type=str, nargs='*',
                               help='A query string, see '
                                    'https://docs.synapse.org/rest/org/sagebionetworks/repo/web/controller/TableExamples.html'
