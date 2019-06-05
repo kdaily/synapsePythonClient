@@ -9,9 +9,13 @@ def _rowset_to_dicts(rowset):
         instances.append(instance)
     return instances
 
-def validate_query(syn, query, schema):
+def query_to_dicts(syn, query):
     res = syn.tableQuery(query)
     # Get data as rowset to avoid type conversion problems.
     rowset = res.asRowSet()
     instances = _rowset_to_dicts(rowset)
+    return instances
+
+def validate_query(syn, query, schema):
+    instances = query_to_dicts(syn, query)
     jsonschema.validate(instance=instances, schema=schema)
