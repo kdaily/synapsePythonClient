@@ -4,7 +4,7 @@ import jsonschema
 def _rowset_to_dicts(rowset):
     header_names = [x['name'] for x in rowset.headers]
     instances = []
-    for row in instances:
+    for row in rowset.rows:
         instance = dict([(k,v) for k,v in zip(header_names, row['values']) if v])
         instances.append(instance)
     return instances
